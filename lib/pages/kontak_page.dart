@@ -28,7 +28,7 @@ class KontakPage extends StatelessWidget {
               ),
             ),
             title: Text(kontak.nama),
-            subtitle: Text('${kontak.email}\n${kontak.noHp}'),
+            subtitle: Text('${kontak.email}\n${kontak.noHp}\n${kontak.kategori ?? "Tanpa kategori"}'),
             isThreeLine: true,
           ),
         );
