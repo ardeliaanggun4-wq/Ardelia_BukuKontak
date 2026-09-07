@@ -9,7 +9,9 @@ class TambahKontakPage extends StatefulWidget {
 }
 
 class _TambahKontakPageState extends State<TambahKontakPage> {
+  // 1. Bungkus dengan Form + GlobalKey<FormState>
   final _formKey = GlobalKey<FormState>();
+
   final namaController = TextEditingController();
   final emailController = TextEditingController();
   final hpController = TextEditingController();
@@ -25,14 +27,16 @@ class _TambahKontakPageState extends State<TambahKontakPage> {
   }
 
   void _simpanKontak() {
+    // 3. Validasi dulu sebelum simpan
     if (_formKey.currentState!.validate()) {
       final kontakBaru = Kontak(
-        nama: namaController.text,
-        email: emailController.text,
-        noHp: hpController.text,
-        kategori: kategoriController.text.isEmpty ? null : kategoriController.text,
+        nama: namaController.text.trim(),
+        email: emailController.text.trim(),
+        noHp: hpController.text.trim(),
+        kategori: kategoriController.text.trim().isEmpty
+            ? null
+            : kategoriController.text.trim(),
       );
-      // Kembali ke halaman Kontak sambil membawa data kontak baru
       Navigator.pop(context, kontakBaru);
     }
   }
@@ -47,16 +51,23 @@ class _TambahKontakPageState extends State<TambahKontakPage> {
           key: _formKey,
           child: Column(
             children: [
+              // 2. Nama -> wajib diisi
               TextFormField(
                 controller: namaController,
                 decoration: const InputDecoration(
                   labelText: 'Nama Lengkap',
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) =>
-                    (value == null || value.isEmpty) ? 'Nama wajib diisi' : null,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Nama wajib diisi';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 12),
+
+              // 2. Email -> wajib diisi & harus mengandung '@'
               TextFormField(
                 controller: emailController,
                 decoration: const InputDecoration(
@@ -64,10 +75,19 @@ class _TambahKontakPageState extends State<TambahKontakPage> {
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.emailAddress,
-                validator: (value) =>
-                    (value == null || value.isEmpty) ? 'Email wajib diisi' : null,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Email wajib diisi';
+                  }
+                  if (!value.contains('@')) {
+                    return 'Email harus mengandung karakter @';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 12),
+
+              // 2. No HP -> hanya angka, minimal 10 digit
               TextFormField(
                 controller: hpController,
                 decoration: const InputDecoration(
@@ -75,18 +95,32 @@ class _TambahKontakPageState extends State<TambahKontakPage> {
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.phone,
-                validator: (value) =>
-                    (value == null || value.isEmpty) ? 'No. HP wajib diisi' : null,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'No. HP wajib diisi';
+                  }
+                  if (!RegExp(r'^[0-9]+$').hasMatch(value.trim())) {
+                    return 'No. HP hanya boleh berisi angka';
+                  }
+                  if (value.trim().length < 10) {
+                    return 'No. HP minimal 10 digit';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 12),
-              TextField(
+
+              // Kategori tetap opsional, tanpa validator
+              TextFormField(
                 controller: kategoriController,
                 decoration: const InputDecoration(
                   labelText: 'Kategori (opsional)',
+                  hintText: 'Keluarga / Teman / Kerja',
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 24),
+
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
