@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/kontak.dart';
 import 'kontak_page.dart';
@@ -16,6 +17,10 @@ class _HomePageState extends State<HomePage>
   late final TabController _tabController;
   final List<Kontak> _kontakList = [];
 
+  // 2. StreamController<String> untuk pencarian
+  final StreamController<String> _searchController =
+      StreamController<String>.broadcast();
+
   @override
   void initState() {
     super.initState();
@@ -25,10 +30,11 @@ class _HomePageState extends State<HomePage>
   @override
   void dispose() {
     _tabController.dispose();
+    // 3. Tutup stream supaya tidak memory leak
+    _searchController.close();
     super.dispose();
   }
 
-  // Membuka Halaman Tambah Kontak, dipanggil dari FAB maupun Drawer
   Future<void> _bukaTambahKontak() async {
     final kontakBaru = await Navigator.push<Kontak>(
       context,
@@ -39,13 +45,12 @@ class _HomePageState extends State<HomePage>
       setState(() {
         _kontakList.add(kontakBaru);
       });
-      // Setelah Simpan ditekan, arahkan kembali ke halaman Kontak
       _tabController.animateTo(0);
     }
   }
 
   void _pilihMenuDrawer(String menu) {
-    Navigator.pop(context); // tutup drawer terlebih dahulu
+    Navigator.pop(context);
 
     switch (menu) {
       case 'kontak':
@@ -61,6 +66,50 @@ class _HomePageState extends State<HomePage>
         Navigator.pushNamed(context, '/tentang');
         break;
     }
+  }
+
+  // 3. Filter List<Kontak> berdasarkan nama ATAU kategori, tidak case-sensitive
+  List<Kontak> _filterKontak(String kataKunci) {
+    if (kataKunci.isEmpty) return _kontakList;
+    final kata = kataKunci.toLowerCase();
+    return _kontakList.where((k) {
+      final namaCocok = k.nama.toLowerCase().contains(kata);
+      final kategoriCocok = (k.kategori ?? '').toLowerCase().contains(kata);
+      return namaCocok || kategoriCocok;
+    }).toList();
+  }
+
+  // 1. TextField pencarian di atas tab Kontak
+  Widget _buildTabKontak() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextField(
+            decoration: const InputDecoration(
+              hintText: 'Cari nama atau kategori...',
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            onChanged: (teks) {
+              // 2. Kirim teks ke stream setiap kali berubah
+              _searchController.add(teks);
+            },
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<String>(
+            stream: _searchController.stream,
+            initialData: '',
+            builder: (context, snapshot) {
+              final hasilPencarian = _filterKontak(snapshot.data ?? '');
+              return KontakPage(kontakList: hasilPencarian);
+            },
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -125,7 +174,7 @@ class _HomePageState extends State<HomePage>
       body: TabBarView(
         controller: _tabController,
         children: [
-          KontakPage(kontakList: _kontakList),
+          _buildTabKontak(),
           const FavoritPage(),
         ],
       ),
