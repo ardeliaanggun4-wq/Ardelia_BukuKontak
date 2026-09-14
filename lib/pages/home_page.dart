@@ -17,7 +17,7 @@ class _HomePageState extends State<HomePage>
   late final TabController _tabController;
   final List<Kontak> _kontakList = [];
 
-  // 2. StreamController<String> untuk pencarian
+  // StreamController<String> untuk pencarian
   final StreamController<String> _searchController =
       StreamController<String>.broadcast();
 
@@ -30,7 +30,7 @@ class _HomePageState extends State<HomePage>
   @override
   void dispose() {
     _tabController.dispose();
-    // 3. Tutup stream supaya tidak memory leak
+    // Tutup stream supaya tidak memory leak
     _searchController.close();
     super.dispose();
   }
@@ -47,6 +47,23 @@ class _HomePageState extends State<HomePage>
       });
       _tabController.animateTo(0);
     }
+  }
+
+  // Dipanggil setelah tombol "Simpan Perubahan" pada halaman Edit ditekan.
+  // index di sini SELALU index pada _kontakList (daftar ASLI, bukan hasil
+  // filter pencarian) — lihat _buildTabKontak untuk pemetaan indexnya.
+  void _updateKontak(int index, Kontak kontakBaru) {
+    setState(() {
+      _kontakList[index] = kontakBaru;
+    });
+  }
+
+  // Dipanggil setelah pengguna memilih "Hapus" pada dialog konfirmasi.
+  // index di sini juga SELALU index pada _kontakList (daftar ASLI).
+  void _hapusKontak(int index) {
+    setState(() {
+      _kontakList.removeAt(index);
+    });
   }
 
   void _pilihMenuDrawer(String menu) {
@@ -68,18 +85,18 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  // 3. Filter List<Kontak> berdasarkan nama ATAU kategori, tidak case-sensitive
+  // Filter List<Kontak> berdasarkan nama ATAU kategori, tidak case-sensitive
   List<Kontak> _filterKontak(String kataKunci) {
     if (kataKunci.isEmpty) return _kontakList;
     final kata = kataKunci.toLowerCase();
     return _kontakList.where((k) {
       final namaCocok = k.nama.toLowerCase().contains(kata);
-      final kategoriCocok = (k.kategori ?? '').toLowerCase().contains(kata);
+      final kategoriCocok = k.kategori.toLowerCase().contains(kata);
       return namaCocok || kategoriCocok;
     }).toList();
   }
 
-  // 1. TextField pencarian di atas tab Kontak
+  // TextField pencarian di atas tab Kontak
   Widget _buildTabKontak() {
     return Column(
       children: [
@@ -93,7 +110,7 @@ class _HomePageState extends State<HomePage>
               isDense: true,
             ),
             onChanged: (teks) {
-              // 2. Kirim teks ke stream setiap kali berubah
+              // Kirim teks ke stream setiap kali berubah
               _searchController.add(teks);
             },
           ),
@@ -104,7 +121,29 @@ class _HomePageState extends State<HomePage>
             initialData: '',
             builder: (context, snapshot) {
               final hasilPencarian = _filterKontak(snapshot.data ?? '');
-              return KontakPage(kontakList: hasilPencarian);
+
+              return KontakPage(
+                kontakList: hasilPencarian,
+                // index yang dikirim KontakPage adalah posisi di
+                // hasilPencarian (list hasil filter). Di sini kita
+                // petakan balik ke index ASLI di _kontakList lewat
+                // objek kontaknya, supaya kontak yang diedit/dihapus
+                // selalu benar walau sedang dalam kondisi dicari.
+                onEdit: (indexFilter, kontakBaru) {
+                  final kontakLama = hasilPencarian[indexFilter];
+                  final indexAsli = _kontakList.indexOf(kontakLama);
+                  if (indexAsli != -1) {
+                    _updateKontak(indexAsli, kontakBaru);
+                  }
+                },
+                onDelete: (indexFilter) {
+                  final kontakLama = hasilPencarian[indexFilter];
+                  final indexAsli = _kontakList.indexOf(kontakLama);
+                  if (indexAsli != -1) {
+                    _hapusKontak(indexAsli);
+                  }
+                },
+              );
             },
           ),
         ),
