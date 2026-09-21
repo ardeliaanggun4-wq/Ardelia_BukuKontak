@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/kontak.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TambahKontakPage extends StatefulWidget {
   const TambahKontakPage({super.key});
@@ -55,16 +55,27 @@ class _TambahKontakPageState extends State<TambahKontakPage> {
     return null;
   }
 
-  void _simpanKontak() {
-    if (_formKey.currentState!.validate()) {
-      final kontakBaru = Kontak(
-        nama: namaController.text.trim(),
-        email: emailController.text.trim(),
-        noHp: hpController.text.trim(),
-        kategori: kategoriTerpilih,
+  Future<void> simpanKontak() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    try {
+      await FirebaseFirestore.instance.collection('kontak').add({
+        'nama': namaController.text.trim(),
+        'email': emailController.text.trim(),
+        'hp': hpController.text.trim(),
+        'kategori': kategoriTerpilih,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Data berhasil disimpan')),
       );
-      // Kembali ke halaman Kontak sambil membawa data kontak baru
-      Navigator.pop(context, kontakBaru);
+      Navigator.pop(context);
+    } catch (e) {
+      debugPrint('ERROR: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menyimpan: $e')),
+      );
     }
   }
 
@@ -129,7 +140,7 @@ class _TambahKontakPageState extends State<TambahKontakPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _simpanKontak,
+                  onPressed: simpanKontak,
                   child: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
                     child: Text('Simpan'),

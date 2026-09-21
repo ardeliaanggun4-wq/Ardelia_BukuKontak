@@ -1,6 +1,4 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import '../models/kontak.dart';
 import 'kontak_page.dart';
 import 'favorit_page.dart';
 import 'tambah_kontak_page.dart';
@@ -15,11 +13,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  final List<Kontak> _kontakList = [];
-
-  // StreamController<String> untuk pencarian
-  final StreamController<String> _searchController =
-      StreamController<String>.broadcast();
 
   @override
   void initState() {
@@ -30,40 +23,17 @@ class _HomePageState extends State<HomePage>
   @override
   void dispose() {
     _tabController.dispose();
-    // Tutup stream supaya tidak memory leak
-    _searchController.close();
     super.dispose();
   }
 
+  // Data disimpan langsung ke Firestore oleh TambahKontakPage,
+  // jadi di sini cukup kembali ke tab Kontak setelah halaman ditutup.
   Future<void> _bukaTambahKontak() async {
-    final kontakBaru = await Navigator.push<Kontak>(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const TambahKontakPage()),
     );
-
-    if (kontakBaru != null) {
-      setState(() {
-        _kontakList.add(kontakBaru);
-      });
-      _tabController.animateTo(0);
-    }
-  }
-
-  // Dipanggil setelah tombol "Simpan Perubahan" pada halaman Edit ditekan.
-  // index di sini SELALU index pada _kontakList (daftar ASLI, bukan hasil
-  // filter pencarian) — lihat _buildTabKontak untuk pemetaan indexnya.
-  void _updateKontak(int index, Kontak kontakBaru) {
-    setState(() {
-      _kontakList[index] = kontakBaru;
-    });
-  }
-
-  // Dipanggil setelah pengguna memilih "Hapus" pada dialog konfirmasi.
-  // index di sini juga SELALU index pada _kontakList (daftar ASLI).
-  void _hapusKontak(int index) {
-    setState(() {
-      _kontakList.removeAt(index);
-    });
+    _tabController.animateTo(0);
   }
 
   void _pilihMenuDrawer(String menu) {
@@ -83,72 +53,6 @@ class _HomePageState extends State<HomePage>
         Navigator.pushNamed(context, '/tentang');
         break;
     }
-  }
-
-  // Filter List<Kontak> berdasarkan nama ATAU kategori, tidak case-sensitive
-  List<Kontak> _filterKontak(String kataKunci) {
-    if (kataKunci.isEmpty) return _kontakList;
-    final kata = kataKunci.toLowerCase();
-    return _kontakList.where((k) {
-      final namaCocok = k.nama.toLowerCase().contains(kata);
-      final kategoriCocok = k.kategori.toLowerCase().contains(kata);
-      return namaCocok || kategoriCocok;
-    }).toList();
-  }
-
-  // TextField pencarian di atas tab Kontak
-  Widget _buildTabKontak() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: TextField(
-            decoration: const InputDecoration(
-              hintText: 'Cari nama atau kategori...',
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            onChanged: (teks) {
-              // Kirim teks ke stream setiap kali berubah
-              _searchController.add(teks);
-            },
-          ),
-        ),
-        Expanded(
-          child: StreamBuilder<String>(
-            stream: _searchController.stream,
-            initialData: '',
-            builder: (context, snapshot) {
-              final hasilPencarian = _filterKontak(snapshot.data ?? '');
-
-              return KontakPage(
-                kontakList: hasilPencarian,
-                // index yang dikirim KontakPage adalah posisi di
-                // hasilPencarian (list hasil filter). Di sini kita
-                // petakan balik ke index ASLI di _kontakList lewat
-                // objek kontaknya, supaya kontak yang diedit/dihapus
-                // selalu benar walau sedang dalam kondisi dicari.
-                onEdit: (indexFilter, kontakBaru) {
-                  final kontakLama = hasilPencarian[indexFilter];
-                  final indexAsli = _kontakList.indexOf(kontakLama);
-                  if (indexAsli != -1) {
-                    _updateKontak(indexAsli, kontakBaru);
-                  }
-                },
-                onDelete: (indexFilter) {
-                  final kontakLama = hasilPencarian[indexFilter];
-                  final indexAsli = _kontakList.indexOf(kontakLama);
-                  if (indexAsli != -1) {
-                    _hapusKontak(indexAsli);
-                  }
-                },
-              );
-            },
-          ),
-        ),
-      ],
-    );
   }
 
   @override
@@ -174,10 +78,7 @@ class _HomePageState extends State<HomePage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  CircleAvatar(
-                    radius: 28,
-                    child: Icon(Icons.person, size: 32),
-                  ),
+                  CircleAvatar(radius: 28, child: Icon(Icons.person, size: 32)),
                   SizedBox(height: 8),
                   Text(
                     'Buku Kontak',
@@ -212,10 +113,7 @@ class _HomePageState extends State<HomePage>
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [
-          _buildTabKontak(),
-          const FavoritPage(),
-        ],
+        children: const [KontakPage(), FavoritPage()],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _bukaTambahKontak,

@@ -1,18 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/kontak.dart';
 import 'edit_kontak_page.dart';
 
 class KontakPage extends StatefulWidget {
-  final List<Kontak> kontakList;
-  final void Function(int index, Kontak kontakBaru) onEdit;
-  final void Function(int index) onDelete;
-
-  const KontakPage({
-    super.key,
-    required this.kontakList,
-    required this.onEdit,
-    required this.onDelete,
-  });
+  const KontakPage({super.key});
 
   @override
   State<KontakPage> createState() => _KontakPageState();
@@ -28,12 +20,16 @@ class _KontakPageState extends State<KontakPage> {
     super.dispose();
   }
 
-  // Membuka Halaman Edit Kontak. index yang dikirim selalu merujuk pada
-  // posisi kontak di daftar ASLI (_kontakList di HomePage), bukan posisi
-  // pada hasil pencarian, sehingga kontak yang diedit tetap benar
-  // walaupun sedang dalam kondisi difilter oleh pencarian.
-  Future<void> _bukaEdit(int index) async {
-    final kontakLama = widget.kontakList[index];
+  void _tampilkanPesan(String pesan) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(pesan)),
+    );
+  }
+
+  // Membuka Halaman Edit Kontak, lalu memperbarui dokumen yang SAMA
+  // di Firestore (dicari lewat kontak.id) sehingga tidak muncul kontak ganda.
+  Future<void> _bukaEdit(Kontak kontakLama) async {
     final hasil = await Navigator.push<Kontak>(
       context,
       MaterialPageRoute(
@@ -41,16 +37,22 @@ class _KontakPageState extends State<KontakPage> {
       ),
     );
 
-    if (hasil != null) {
-      widget.onEdit(index, hasil);
+    if (hasil == null) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('kontak')
+          .doc(kontakLama.id)
+          .update(hasil.toMap());
+      _tampilkanPesan('Data berhasil diperbarui');
+    } catch (e) {
+      debugPrint('ERROR EDIT: $e');
+      _tampilkanPesan('Gagal memperbarui: $e');
     }
   }
 
-  // Menampilkan dialog konfirmasi sebelum menghapus. index yang dikirim
-  // juga selalu merujuk pada posisi kontak di daftar ASLI, dengan alasan
-  // yang sama seperti pada _bukaEdit di atas.
-  Future<void> _konfirmasiHapus(int index) async {
-    final kontak = widget.kontakList[index];
+  // Dialog konfirmasi, lalu hapus dokumen di Firestore lewat kontak.id
+  Future<void> _konfirmasiHapus(Kontak kontak) async {
     final konfirmasi = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -69,26 +71,22 @@ class _KontakPageState extends State<KontakPage> {
       ),
     );
 
-    // Jika memilih Batal (atau dialog ditutup), kontak tidak boleh terhapus
-    if (konfirmasi == true) {
-      widget.onDelete(index);
+    if (konfirmasi != true) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('kontak')
+          .doc(kontak.id)
+          .delete();
+      _tampilkanPesan('Kontak berhasil dihapus');
+    } catch (e) {
+      debugPrint('ERROR HAPUS: $e');
+      _tampilkanPesan('Gagal menghapus: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Pasangkan setiap kontak dengan index aslinya di _kontakList,
-    // lalu filter berdasarkan kata kunci pencarian (nama).
-    final List<MapEntry<int, Kontak>> hasilPencarian = [];
-    for (int i = 0; i < widget.kontakList.length; i++) {
-      final kontak = widget.kontakList[i];
-      final cocok = _kataKunci.isEmpty ||
-          kontak.nama.toLowerCase().contains(_kataKunci.toLowerCase());
-      if (cocok) {
-        hasilPencarian.add(MapEntry(i, kontak));
-      }
-    }
-
     return Column(
       children: [
         Padding(
@@ -96,7 +94,7 @@ class _KontakPageState extends State<KontakPage> {
           child: TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'Cari kontak berdasarkan nama...',
+              hintText: 'Cari nama atau kategori...',
               prefixIcon: const Icon(Icons.search),
               border: const OutlineInputBorder(),
               suffixIcon: _kataKunci.isEmpty
@@ -113,52 +111,88 @@ class _KontakPageState extends State<KontakPage> {
           ),
         ),
         Expanded(
-          child: widget.kontakList.isEmpty
-              ? const Center(
-                  child: Text('Belum ada kontak. Tekan tombol + untuk menambah.'),
-                )
-              : hasilPencarian.isEmpty
-                  ? const Center(child: Text('Kontak tidak ditemukan.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: hasilPencarian.length,
-                      itemBuilder: (context, i) {
-                        final indexAsli = hasilPencarian[i].key;
-                        final kontak = hasilPencarian[i].value;
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              child: Text(
-                                kontak.nama.isNotEmpty
-                                    ? kontak.nama[0].toUpperCase()
-                                    : '?',
-                              ),
-                            ),
-                            title: Text(kontak.nama),
-                            subtitle: Text(
-                              '${kontak.email}\n${kontak.noHp}\nKategori: ${kontak.kategori}',
-                            ),
-                            isThreeLine: true,
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.indigo),
-                                  tooltip: 'Edit',
-                                  onPressed: () => _bukaEdit(indexAsli),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  tooltip: 'Hapus',
-                                  onPressed: () => _konfirmasiHapus(indexAsli),
-                                ),
-                              ],
-                            ),
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream:
+                FirebaseFirestore.instance.collection('kontak').snapshots(),
+            builder: (context, snapshot) {
+              // Sedang memuat data
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              // Terjadi error
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text('Terjadi kesalahan: ${snapshot.error}'),
+                );
+              }
+
+              // Ubah dokumen Firestore menjadi daftar Kontak
+              final semuaKontak = (snapshot.data?.docs ?? [])
+                  .map((doc) => Kontak.fromFirestore(doc))
+                  .toList();
+
+              // Saring berdasarkan kata kunci pencarian (nama)
+              final hasilPencarian = semuaKontak.where((k) {
+                final kata = _kataKunci.toLowerCase();
+                return _kataKunci.isEmpty ||
+                    k.nama.toLowerCase().contains(kata) ||
+                    k.kategori.toLowerCase().contains(kata);
+              }).toList();
+
+              if (semuaKontak.isEmpty) {
+                return const Center(
+                  child: Text(
+                      'Belum ada kontak. Tekan tombol + untuk menambah.'),
+                );
+              }
+
+              if (hasilPencarian.isEmpty) {
+                return const Center(child: Text('Kontak tidak ditemukan.'));
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(8),
+                itemCount: hasilPencarian.length,
+                itemBuilder: (context, i) {
+                  final kontak = hasilPencarian[i];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(
+                        vertical: 6, horizontal: 4),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        child: Text(
+                          kontak.nama.isNotEmpty
+                              ? kontak.nama[0].toUpperCase()
+                              : '?',
+                        ),
+                      ),
+                      title: Text(kontak.nama),
+                      subtitle: Text(
+                        '${kontak.email}\n${kontak.noHp}\nKategori: ${kontak.kategori}',
+                      ),
+                      isThreeLine: true,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.indigo),
+                            tooltip: 'Edit',
+                            onPressed: () => _bukaEdit(kontak),
                           ),
-                        );
-                      },
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            tooltip: 'Hapus',
+                            onPressed: () => _konfirmasiHapus(kontak),
+                          ),
+                        ],
+                      ),
                     ),
+                  );
+                },
+              );
+            },
+          ),
         ),
       ],
     );
