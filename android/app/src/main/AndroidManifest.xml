@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
+<<<<<<< HEAD
         android:label="Contact BookApp"
+=======
+        android:label="kontak_form"
+>>>>>>> e39466042a1b44fd878c64480cb2287f4487c77f
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
