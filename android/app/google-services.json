@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "107083796120",
+    "project_id": "ardelia-bukukontak",
+    "storage_bucket": "ardelia-bukukontak.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:107083796120:android:555c9377a67847f1f50aed",
+        "android_client_info": {
+          "package_name": "com.example.kontak_form"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZhkKFzyNCgYD61XAOCcb4de0UX_vLinQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
